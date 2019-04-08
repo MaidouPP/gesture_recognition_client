@@ -1,0 +1,30 @@
+syntax = "proto3";
+
+package cogrob.perception.openpose;
+
+message KeyPoint2D {
+  // TODO(shengye): Add notes about the corrdinate system we use for 2D
+  // detection (assuming we are using OpenCV corrdinate conventions?)
+  double x = 1;
+  double y = 2;
+}
+
+message KeyPoint3D {
+  double x = 1;
+  double y = 2;
+  double z = 3;
+}
+
+message KeyPointsOfPerson2D {
+  repeated KeyPoint2D body_pts = 1;
+  repeated KeyPoint2D l_hand_pts = 2;
+  repeated KeyPoint2D r_hand_pts = 3;
+  repeated KeyPoint2D face_pts = 4;
+}
+
+message KeyPointsOfPerson3D {
+  repeated KeyPoint3D body_pts = 1;
+  repeated KeyPoint3D l_hand_pts = 2;
+  repeated KeyPoint3D r_hand_pts = 3;
+  repeated KeyPoint3D face_pts = 4;
+}

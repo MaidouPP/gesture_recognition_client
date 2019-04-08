@@ -1,0 +1,82 @@
+syntax = "proto3";
+
+package cogrob.perception.openpose;
+import "gesture_recognition_client/proto/openpose.proto";
+
+enum PictureFormat {
+  UNKNOWN_PICTURE_FORMAT = 0;
+  PNG_PICTURE_FORMAT = 1;
+  JPG_PICTURE_FORMAT = 2;
+  BMP_PICTURE_FORMAT = 3;
+}
+
+message Get2DKeyPointsOnImageRequest {
+  // Image data (with it encoding).
+  bytes image_data = 1;
+  PictureFormat image_format = 2;
+
+  // Whether the client wants to detect the pose of the hands.
+  bool detect_hands = 3;
+
+  // Whether the client wants to detect the pose of the face.
+  bool detect_face = 4;
+
+  // Whether the clients wants the server to redenr a picture with detected
+  // keypoints.
+  bool render = 5;
+}
+
+message Get3DKeyPointsOnStereoImagesRequest {
+  // Image data (with it encoding).
+  bytes image_data_0 = 1;
+  bytes image_data_1 = 2;
+  PictureFormat image_format = 3;
+  int64 frame_id = 4;
+
+  // Whether the client wants to detect the pose of the hands.
+  bool detect_hands = 5;
+
+  // Whether the client wants to detect the pose of the face.
+  bool detect_face = 6;
+
+  // Whether the clients wants the server to redenr a picture with detected
+  // keypoints.
+  bool render = 7;
+
+  // Camera matrix (intrincis * extrinsic) for each camera
+  repeated float camera_matrix_0 = 8;
+  repeated float camera_matrix_1 = 9;
+
+  // Intrinsic 
+  repeated float intrinsic_matrix = 12;
+}
+
+message Get2DKeyPointsOnImageResponse {
+  // Keypoints of a person. The components (e.g. hand_keypoints) will only be
+  // available if the corresponding options in the request is enabled.
+  KeyPointsOfPerson2D person_2d = 1;
+
+  // Rendered image, only true when "render" in request in true.
+  bytes rendered_image_data = 2;
+  PictureFormat rendered_image_format = 3;
+}
+
+message Get3DKeyPointsOnStereoImagesResponse {
+  // Keypoints of a person. The components (e.g. hand_keypoints) will only be
+  // available if the corresponding options in the request is enabled.
+  repeated KeyPointsOfPerson3D persons_3d = 1;
+
+  // Rendered image, only true when "render" in request in true.
+  bytes rendered_image_data_0 = 2;
+  bytes rendered_image_data_1 = 3;
+  PictureFormat rendered_image_format = 4;
+}
+
+service OpenPoseRpc {
+  rpc Get2DKeyPointsOnImage(Get2DKeyPointsOnImageRequest)
+      returns (Get2DKeyPointsOnImageResponse);
+  rpc Get2DKeyPointsOnStreamingImages(stream Get2DKeyPointsOnImageRequest)
+      returns (stream Get2DKeyPointsOnImageResponse);
+  rpc Get3DKeyPointsOnStereoImages(Get3DKeyPointsOnStereoImagesRequest)
+      returns (Get3DKeyPointsOnStereoImagesResponse);
+}
