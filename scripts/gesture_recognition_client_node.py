@@ -1,7 +1,6 @@
 #!/usr/bin/env python
 
 from absl import flags
-from absl import logging
 from hmmlearn import hmm
 from sklearn.cluster import KMeans
 from time import gmtime, strftime
@@ -9,7 +8,6 @@ from time import gmtime, strftime
 import cv2
 import grpc
 import hmmlearn
-# import logging
 import pickle
 import numpy as np
 import os
@@ -23,6 +21,7 @@ import use_cogrob_workspace
 from cogrob.perception.gesture.hmm_gesture_recognizer import GestureRecognizer
 from gesture_recognition_client.proto import openpose_rpc_pb2
 from gesture_recognition_client.proto import openpose_rpc_pb2_grpc
+from gesture_recognition_client_node.msg import Gesture
 
 FLAGS = flags.FLAGS
 
@@ -63,7 +62,7 @@ class WaitToTerminate:
 
 class RequestIterator(object):
   def __init__(self):
-    logging.info("Opening Video Capture Device")
+    rospy.loginfo("Opening Video Capture Device")
     self._cap = cv2.VideoCapture(0)
     self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     # It turns out the first read will take some extra time.
@@ -71,7 +70,7 @@ class RequestIterator(object):
     self._cap.read()
     self._next_send_time = time.time()
     self._send_interval = 1.0 / FLAGS.fps
-    logging.info("Opened Video Capture Device")
+    rospy.loginfo("Opened Video Capture Device")
 
 
   def __iter__(self):
@@ -79,17 +78,14 @@ class RequestIterator(object):
 
 
   def _next(self):
-    # logging.error("Trying to read from _cap")
-
     # Prevents the client send too fast.
     if time.time() < self._next_send_time:
       time.sleep(self._next_send_time - time.time())
       self._next_send_time = time.time() + self._send_interval
 
     ret, img = self._cap.read()
-    # logging.info("Done read from _cap")
     if not ret:
-      logging.error("Returned data is None.")
+      rospy.logerror("Returned data is None.")
       return None
     else:
       request = openpose_rpc_pb2.Get2DKeyPointsOnImageRequest()
@@ -101,7 +97,6 @@ class RequestIterator(object):
       else:
         raise NotImplementedError("Unsupport format: " + FLAGS.format)
 
-      # logging.info("Encoded image is %d bytes.", len(img_str))
       request.image_data = img_str
       return request
 
@@ -186,6 +181,9 @@ class GestureClient(object):
       self._client_thread.daemon = True
       self._client_thread.start()
 
+      # ROS publisher
+      self._publisher = rospy.Publisher("gesture_recognition/gesture", Gesture, queue_size=10)
+
     def _Run(self):
       rospy.loginfo("Started receiving responses from server.")
 
@@ -196,7 +194,7 @@ class GestureClient(object):
 
         body_pts = response.person_2d.body_pts
         if len(body_pts) == 0:
-          logging.info("No body points detected yet.")
+          rospy.logerror("No body points detected yet.")
           continue
         # Get left and right hand coordinate
         normalized_body_pts = ReadBodyPts(body_pts)
@@ -204,7 +202,11 @@ class GestureClient(object):
         # Check whether the static gesture applied
         static_ges = CheckStaticGesture(normalized_body_pts)
         if static_ges != -1:
-          logging.info("User is doing {}".format(kStaticGestures[static_ges]))
+          rospy.loginfo("User is doing {}".format(kStaticGestures[static_ges]))
+          ges_msg = Gesture()
+          ges_msg.header.stamp = rospy.get_rostime()
+          ges_msg.gesture_name = kStaticGestures[static_ges]
+          self._publisher.publish(ges_msg)
           self._left_x = []
           self._right_x = []
           continue
@@ -220,7 +222,12 @@ class GestureClient(object):
           self._left_x.append(left_feature)
           left_ges, left_score = self._left_gesture_recognier.Test(self._left_x)
           if left_ges > -1:
-            logging.info("User left hand is doing {} with score {}".format
+            ges_msg = Gesture()
+            ges_msg.header.stamp = rospy.get_rostime()
+            ges_msg.gesture_name = self._left_gesture_recognier.gestures[left_ges]
+            ges_msg.score = left_score
+            self._publisher.publish(ges_msg)
+            rospy.loginfo("User left hand is doing {} with score {}".format
                          (self._left_gesture_recognier.gestures[left_ges], left_score))
             self._left_x = [] # left_x[len(left_x)/2:]
         else:
@@ -231,7 +238,12 @@ class GestureClient(object):
           self._right_x.append(right_feature)
           right_ges, right_score = self._right_gesture_recognier.Test(self._right_x)
           if right_ges > -1:
-            logging.info("User right hand is doing {} with score {}".format
+            ges_msg = Gesture()
+            ges_msg.header.stamp = rospy.get_rostime()
+            ges_msg.gesture_name = self._right_gesture_recognier.gestures[right_ges]
+            ges_msg.score = right_score
+            self._publisher.publish(ges_msg)
+            rospy.loginfo("User right hand is doing {} with score {}".format
                          (self._right_gesture_recognier.gestures[right_ges], right_score))
             self._right_x = []  # right_x[len(right_x)/2:]
         else:
@@ -252,8 +264,7 @@ class GestureClient(object):
 def Run(argv):
   FLAGS(argv)
 
-  logging.set_verbosity(logging.INFO)
-  logging.info("gesture_recognition_client_node started.")
+  rospy.loginfo("gesture_recognition_client_node started.")
   rospy.init_node('gesture_recognition_client_node')
 
   FLAGS.format = FLAGS.format.upper()
