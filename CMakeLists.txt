@@ -1,5 +1,6 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(gesture_recognition_client)
+
 find_package(catkin REQUIRED COMPONENTS
 grpc
 std_msgs

@@ -21,7 +21,7 @@ import use_cogrob_workspace
 from cogrob.perception.gesture.hmm_gesture_recognizer import GestureRecognizer
 from gesture_recognition_client.proto import openpose_rpc_pb2
 from gesture_recognition_client.proto import openpose_rpc_pb2_grpc
-from gesture_recognition_client_node.msg import Gesture
+from gesture_recognition_client.msg import Gesture
 
 FLAGS = flags.FLAGS
 
@@ -85,7 +85,7 @@ class RequestIterator(object):
 
     ret, img = self._cap.read()
     if not ret:
-      rospy.logerror("Returned data is None.")
+      rospy.logerr("Returned data is None.")
       return None
     else:
       request = openpose_rpc_pb2.Get2DKeyPointsOnImageRequest()
@@ -143,7 +143,7 @@ def CheckStaticGesture(body_pts):
 
   # Check if it's a cross or an euqal body sign
   if np.abs(left_elbow[1] - right_elbow[1]) < kSmallDis and \
-     np.abs(left_wrist[1] - right_wrist[1]) < kSmallDis and \
+     np.abs(right_wrist[1] - left_wrist[1]) < kSmallDis and \
      left_elbow[0] * left_wrist[0] < 0 and \
      right_elbow[0] * right_wrist[0] < 0 and \
      AngleBetweenVectors(left_arm, right_arm) < np.pi * 0.75 and \
@@ -185,6 +185,7 @@ class GestureClient(object):
       self._publisher = rospy.Publisher("gesture_recognition/gesture", Gesture, queue_size=10)
 
     def _Run(self):
+      r = rospy.Rate(10) # 10hz
       rospy.loginfo("Started receiving responses from server.")
 
       # Start receiving streaming responses
@@ -194,10 +195,17 @@ class GestureClient(object):
 
         body_pts = response.person_2d.body_pts
         if len(body_pts) == 0:
-          rospy.logerror("No body points detected yet.")
+          rospy.logerr("No body points detected yet.")
           continue
         # Get left and right hand coordinate
         normalized_body_pts = ReadBodyPts(body_pts)
+
+        left_feature = np.array([normalized_body_pts[6][0], normalized_body_pts[6][1]], dtype=np.float32)
+        right_feature = np.array([normalized_body_pts[3][0], normalized_body_pts[3][1]], dtype=np.float32)
+        if np.isnan(left_feature).any() or np.isnan(left_feature).any():
+          rospy.logerr("Joints of interest not detected correctly.")
+          continue
+        print left_feature, right_feature
 
         # Check whether the static gesture applied
         static_ges = CheckStaticGesture(normalized_body_pts)
@@ -210,9 +218,6 @@ class GestureClient(object):
           self._left_x = []
           self._right_x = []
           continue
-
-        left_feature = np.array([normalized_body_pts[6][0], normalized_body_pts[6][1]], dtype=np.float32)
-        right_feature = np.array([normalized_body_pts[3][0], normalized_body_pts[3][1]], dtype=np.float32)
 
         # Classify left and right hand separately
         left_ges = -1
@@ -259,6 +264,7 @@ class GestureClient(object):
         if cv2.waitKey(kMsecToWait) & 0xFF == kEscCode:
           break
 
+        r.sleep()
 
 
 def Run(argv):
