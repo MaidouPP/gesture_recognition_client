@@ -45,7 +45,7 @@ flags.DEFINE_string("right_gesture_model_path",
                     "Path to right gesture trained HMM model.")
 
 kLenOfGestureSeries = 5
-kStaticGestures = ["Cross", "Equal"]
+kStaticGestures = ["cross", "equal"]
 kSmallDis = 0.1
 
 
@@ -222,16 +222,13 @@ class GestureClient(object):
         # Classify left and right hand separately
         left_ges = -1
         right_ges = -1
+        left_score = -1000
+        right_score = -1000
         if len(self._left_x) >= kLenOfGestureSeries:
           self._left_x = self._left_x[1:]
           self._left_x.append(left_feature)
           left_ges, left_score = self._left_gesture_recognier.Test(self._left_x)
           if left_ges > -1:
-            ges_msg = Gesture()
-            ges_msg.header.stamp = rospy.get_rostime()
-            ges_msg.gesture_name = self._left_gesture_recognier.gestures[left_ges]
-            ges_msg.score = left_score
-            self._publisher.publish(ges_msg)
             rospy.loginfo("User left hand is doing {} with score {}".format
                          (self._left_gesture_recognier.gestures[left_ges], left_score))
             self._left_x = [] # left_x[len(left_x)/2:]
@@ -243,16 +240,28 @@ class GestureClient(object):
           self._right_x.append(right_feature)
           right_ges, right_score = self._right_gesture_recognier.Test(self._right_x)
           if right_ges > -1:
-            ges_msg = Gesture()
-            ges_msg.header.stamp = rospy.get_rostime()
-            ges_msg.gesture_name = self._right_gesture_recognier.gestures[right_ges]
-            ges_msg.score = right_score
-            self._publisher.publish(ges_msg)
             rospy.loginfo("User right hand is doing {} with score {}".format
                          (self._right_gesture_recognier.gestures[right_ges], right_score))
             self._right_x = []  # right_x[len(right_x)/2:]
         else:
           self._right_x.append(right_feature)
+
+        # Publish gesture topic
+        ges_msg = Gesture()
+        ges_msg.header.stamp = rospy.get_rostime()
+        if left_ges == -1 and right_ges == -1:
+          continue
+        elif left_ges > 0 and right_ges > 0:
+          ges_msg.gesture_name = self._left_gesture_recognier.gestures[left_ges] + '_' + \
+                                 self._right_gesture_recognier.gestures[right_ges]
+          ges_msg.score = (left_score + right_score) / 2
+        elif left_ges > 0:
+          ges_msg.gesture_name = self._left_gesture_recognier.gestures[left_ges]
+          ges_msg.score = left_score
+        elif right_ges > 0:
+          ges_msg.gesture_name = self._right_gesture_recognier.gestures[right_ges]
+          ges_msg.score = right_score
+        self._publisher.publish(ges_msg)
 
         # Display rendered image.
         buf = np.asarray(
