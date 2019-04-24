@@ -246,7 +246,7 @@ class GestureClient(object):
         else:
           self._right_x.append(right_feature)
 
-        # Publish gesture topic
+        # Publish gesture topic (combine the gesture from left and right hand)
         ges_msg = Gesture()
         ges_msg.header.stamp = rospy.get_rostime()
         if left_ges == -1 and right_ges == -1:
