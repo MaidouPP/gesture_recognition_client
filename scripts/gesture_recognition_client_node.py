@@ -63,7 +63,7 @@ class WaitToTerminate:
 class RequestIterator(object):
   def __init__(self):
     rospy.loginfo("Opening Video Capture Device")
-    self._cap = cv2.VideoCapture(0)
+    self._cap = cv2.VideoCapture(1)
     self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     # It turns out the first read will take some extra time.
     self._cap.read()
@@ -205,7 +205,6 @@ class GestureClient(object):
         if np.isnan(left_feature).any() or np.isnan(left_feature).any():
           rospy.logerr("Joints of interest not detected correctly.")
           continue
-        print left_feature, right_feature
 
         # Check whether the static gesture applied
         static_ges = CheckStaticGesture(normalized_body_pts)
@@ -217,6 +216,7 @@ class GestureClient(object):
           self._publisher.publish(ges_msg)
           self._left_x = []
           self._right_x = []
+          r.sleep()
           continue
 
         # Classify left and right hand separately
