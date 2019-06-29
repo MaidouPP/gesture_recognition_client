@@ -63,7 +63,7 @@ class WaitToTerminate:
 class RequestIterator(object):
   def __init__(self):
     rospy.loginfo("Opening Video Capture Device")
-    self._cap = cv2.VideoCapture(1)
+    self._cap = cv2.VideoCapture(2)
     self._cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
     # It turns out the first read will take some extra time.
     self._cap.read()
@@ -89,6 +89,7 @@ class RequestIterator(object):
       return None
     else:
       request = openpose_rpc_pb2.Get2DKeyPointsOnImageRequest()
+      img = cv2.resize(img, (0, 0), fx=0.4, fy=0.4)
       if FLAGS.format == "PNG":
         img_str = cv2.imencode(".png", img)[1].tostring()
         request.image_format = openpose_rpc_pb2.PNG_PICTURE_FORMAT
@@ -216,6 +217,15 @@ class GestureClient(object):
           self._publisher.publish(ges_msg)
           self._left_x = []
           self._right_x = []
+          buf = np.asarray(
+              bytearray(response.rendered_image_data), dtype=np.uint8)
+          img = cv2.imdecode(buf, cv2.IMREAD_UNCHANGED)
+          print("showing frame")
+          cv2.imshow("frame", img)
+          kMsecToWait = 10
+          kEscCode = 27
+          if cv2.waitKey(kMsecToWait) & 0xFF == kEscCode:
+              break
           r.sleep()
           continue
 
@@ -251,14 +261,14 @@ class GestureClient(object):
         ges_msg.header.stamp = rospy.get_rostime()
         if left_ges == -1 and right_ges == -1:
           continue
-        elif left_ges > 0 and right_ges > 0:
+        elif left_ges >= 0 and right_ges >= 0:
           ges_msg.gesture_name = self._left_gesture_recognier.gestures[left_ges] + '_' + \
                                  self._right_gesture_recognier.gestures[right_ges]
           ges_msg.score = (left_score + right_score) / 2
-        elif left_ges > 0:
+        elif left_ges >= 0:
           ges_msg.gesture_name = self._left_gesture_recognier.gestures[left_ges]
           ges_msg.score = left_score
-        elif right_ges > 0:
+        elif right_ges >= 0:
           ges_msg.gesture_name = self._right_gesture_recognier.gestures[right_ges]
           ges_msg.score = right_score
         self._publisher.publish(ges_msg)
@@ -267,6 +277,7 @@ class GestureClient(object):
         buf = np.asarray(
           bytearray(response.rendered_image_data), dtype=np.uint8)
         img = cv2.imdecode(buf, cv2.IMREAD_UNCHANGED)
+        print("showing frame")
         cv2.imshow("frame", img)
         kMsecToWait = 10
         kEscCode = 27
